@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>H5P Video Player - Test</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/h5p-standalone@latest/dist/styles/h5p.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f0f1a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 2px 20px rgba(0,0,0,0.4);
+    }
+    .header-title { font-size: 18px; font-weight: 700; letter-spacing: 0.3px; color: #c7d2fe; }
+    .header-badge { font-size: 11px; background: #4f46e5; color: #e0e7ff; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+
+    /* ── Control Panel ── */
+    .control-panel {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: #1a1a2e;
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 14px;
+      padding: 14px 22px;
+      margin: 18px auto;
+      max-width: 860px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+      flex-wrap: wrap;
+    }
+    .control-label { font-size: 14px; font-weight: 600; color: #94a3b8; flex: 1; min-width: 160px; }
+    .control-label span { display: block; font-size: 11px; font-weight: 400; color: #64748b; margin-top: 2px; }
+
+    /* Mode Buttons */
+    .mode-group { display: flex; gap: 8px; align-items: center; }
+    .mode-group label { font-size: 12px; font-weight: 600; color: #64748b; margin-right: 4px; }
+    .mode-btn {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+      background: #1e293b;
+      color: #64748b;
+      border-color: #334155;
+    }
+    .mode-btn:hover { transform: translateY(-1px); }
+    .mode-btn.active-none  { background: rgba(16,185,129,0.15); color: #34d399; border-color: rgba(52,211,153,0.4); }
+    .mode-btn.active-full  { background: rgba(239,68,68,0.15);  color: #f87171; border-color: rgba(248,113,113,0.4); }
+    .mode-btn.active-both  { background: rgba(245,158,11,0.15); color: #fbbf24; border-color: rgba(251,191,36,0.4); }
+
+    /* Status Badge */
+    .status-badge {
+      font-size: 12px; font-weight: 700; padding: 5px 14px;
+      border-radius: 20px; transition: all 0.3s ease; white-space: nowrap;
+    }
+    .status-none { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(52,211,153,0.3); }
+    .status-full { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
+    .status-both { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+
+    /* Divider */
+    .divider { width: 1px; height: 32px; background: rgba(255,255,255,0.08); }
+
+    /* Info box */
+    .mode-info {
+      max-width: 860px;
+      margin: 0 auto 12px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.6;
+      border-left: 3px solid;
+      transition: all 0.3s ease;
+    }
+    .mode-info.info-none { background: rgba(16,185,129,0.08); border-color: #34d399; color: #6ee7b7; }
+    .mode-info.info-full { background: rgba(239,68,68,0.08);  border-color: #f87171; color: #fca5a5; }
+    .mode-info.info-both { background: rgba(245,158,11,0.08); border-color: #fbbf24; color: #fde68a; }
+
+    /* Reset button */
+    .btn-reset {
+      background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.35);
+      color: #a5b4fc; font-size: 12px; font-weight: 600; padding: 7px 16px;
+      border-radius: 8px; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;
+    }
+    .btn-reset:hover { background: rgba(99,102,241,0.3); color: #c7d2fe; transform: translateY(-1px); }
+
+    /* ── H5P Player ── */
+    .player-wrap {
+      max-width: 860px; margin: 0 auto 24px; border-radius: 14px;
+      overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    #h5p-container { background: #000; }
+
+    /* ── Log Panel ── */
+    .log-panel {
+      max-width: 860px; margin: 0 auto 28px;
+      background: #0d1117; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; overflow: hidden;
+    }
+    .log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; background: #161b22; border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .log-title { font-size: 12px; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+    .btn-clear-log { font-size: 11px; color: #6e7681; background: none; border: none; cursor: pointer; padding: 2px 8px; border-radius: 4px; transition: color 0.2s; }
+    .btn-clear-log:hover { color: #c9d1d9; }
+    .log-list { padding: 10px; max-height: 180px; overflow-y: auto; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+    .log-item { padding: 3px 8px; border-radius: 4px; margin-bottom: 2px; animation: fadeInLog 0.2s ease; }
+    @keyframes fadeInLog { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .log-item.block { background: rgba(239,68,68,0.1); color: #f87171; }
+    .log-item.allow { background: rgba(16,185,129,0.1); color: #34d399; }
+    .log-item.info  { background: rgba(99,102,241,0.1); color: #a5b4fc; }
+    .log-item.warn  { background: rgba(245,158,11,0.1); color: #fbbf24; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <span class="header-title">🎬 H5P Interactive Video</span>
+    <span class="header-badge">Dev Test Mode</span>
+  </div>
+
+  <!-- Control Panel -->
+  <div class="control-panel">
+    <div class="control-label">
+      Chế độ chặn tua (preventSkippingMode)
+      <span>Thay đổi tham số chuẩn của H5P trong runtime</span>
+    </div>
+
+    <div class="mode-group">
+      <label>Chế độ:</label>
+      <button class="mode-btn" id="btnNone" onclick="setMode('none')" title="Cho phép tua tự do">🔓 none</button>
+      <button class="mode-btn active-full" id="btnFull" onclick="setMode('full')" title="Chặn tua tới phần chưa xem">🔒 full</button>
+      <button class="mode-btn" id="btnBoth" onclick="setMode('both')" title="Khóa hoàn toàn thanh điều hướng">⛔ both</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div id="statusBadge" class="status-badge status-full">🔒 full — chặn tua tới</div>
+
+    <div class="divider"></div>
+
+    <button class="btn-reset" id="btnReset" onclick="resetProgress()" title="Đưa video và mốc thời gian đã xem về 0">↺ Reset</button>
+  </div>
+
+  <!-- Info Box -->
+  <div class="mode-info info-full" id="modeInfo">
+    <strong>full:</strong> Học viên chỉ có thể seek ngược về phần đã xem. Không thể tua tới phần chưa xem. Đây là giá trị mặc định trong content.json.
+  </div>
+
+  <!-- H5P Player -->
+  <div class="player-wrap">
+    <div id="h5p-container"></div>
+  </div>
+
+  <!-- Log Panel -->
+  <div class="log-panel">
+    <div class="log-header">
+      <span class="log-title">📋 Event Log</span>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-clear-log" onclick="copyText('logList', this)">Sao chép</button>
+        <button class="btn-clear-log" onclick="logList.innerHTML=''">Xóa log</button>
+      </div>
+    </div>
+    <div class="log-list" id="logList">
+      <div class="log-item info">[ready] Đang khởi tạo H5P Player với preventSkippingMode = "full"...</div>
+    </div>
+  </div>
+
+  <!-- JSON Debug Panel -->
+  <div class="log-panel">
+    <div class="log-header">
+      <span class="log-title">📦 JSON Interaction Data (xAPI)</span>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-clear-log" onclick="openInNewTab('jsonDump')">📄 Mở Tab mới (Thuần JSON)</button>
+        <button class="btn-clear-log" onclick="copyText('jsonDump', this)">Sao chép</button>
+        <button class="btn-clear-log" onclick="document.getElementById('jsonDump').textContent=''">Xóa JSON</button>
+      </div>
+    </div>
+    <pre class="log-list" id="jsonDump" style="color: #a5b4fc; margin: 0; padding: 10px; max-height: 250px; font-size: 11px; white-space: pre-wrap; word-wrap: break-word;"></pre>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/h5p-standalone@latest/dist/main.bundle.js"></script>
+  <script>
+    var logList = document.getElementById('logList');
+    var jsonDump = document.getElementById('jsonDump');
+    var currentMode = 'full';
+
+    // ── Copy Function ──
+    function copyText(elementId, btn) {
+      var el = document.getElementById(elementId);
+      var text = elementId === 'logList' ? el.innerText : el.textContent;
+      
+      navigator.clipboard.writeText(text).then(function() {
+        var originalText = btn.textContent;
+        btn.textContent = '✅ Đã chép!';
+        btn.style.color = '#34d399';
+        setTimeout(function() {
+          btn.textContent = originalText;
+          btn.style.color = '';
+        }, 1500);
+      });
+    }
+
+    // Mở JSON trong cửa sổ mới (Thuần JSON)
+    function openInNewTab(elementId) {
+      var text = document.getElementById(elementId).textContent;
+      // Tìm JSON đầu tiên trong text (vì dumpJson có thêm header --- [Time] ---)
+      var jsonMatch = text.match(/\{[\s\S]*\}/);
+      var jsonStr = jsonMatch ? jsonMatch[0] : text;
+      
+      var blob = new Blob([jsonStr], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    }
+
+    // Gửi dữ liệu về Python Backend
+    function syncToBackend(data) {
+      fetch('/log-interaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }).catch(err => console.error('Lỗi sync backend:', err));
+    }
+
+    // ── Logging ──
+    function addLog(msg, type) {
+      var ts = new Date().toLocaleTimeString('vi-VN');
+      var item = document.createElement('div');
+      item.className = 'log-item ' + (type || 'info');
+      item.textContent = '[' + ts + '] ' + msg;
+      logList.appendChild(item);
+      logList.scrollTop = logList.scrollHeight;
+    }
+
+    function dumpJson(title, obj) {
+      var ts = new Date().toLocaleTimeString('vi-VN');
+      var text = `\n--- [${ts}] ${title} ---\n`;
+      text += JSON.stringify(obj, null, 2);
+      jsonDump.textContent = text + jsonDump.textContent; // Đẩy lên đầu
+    }
+
+    // ── Lấy H5P iframe ──
+    function getIframe() {
+      return document.querySelector('iframe.h5p-iframe');
+    }
+
+    function sendToIframe(msg) {
+      var iframe = getIframe();
+      if (iframe && iframe.contentWindow) iframe.contentWindow.postMessage(msg, '*');
+    }
+
+    // ── Đổi chế độ ──
+    var modeInfo = {
+      'none': { label: '🔓 none — tua tự do', cls: 'status-none', infoCls: 'info-none', desc: '<strong>none:</strong> Không chặn gì cả.' },
+      'full': { label: '🔒 full — chặn tua tới', cls: 'status-full', infoCls: 'info-full', desc: '<strong>full:</strong> Chỉ có thể seek ngược về phần đã xem.' },
+      'both': { label: '⛔ both — khóa hoàn toàn', cls: 'status-both', infoCls: 'info-both', desc: '<strong>both:</strong> Thanh điều hướng bị khóa hoàn toàn.' }
+    };
+
+    function setMode(mode) {
+      currentMode = mode;
+      var info = modeInfo[mode];
+      document.getElementById('statusBadge').className = 'status-badge ' + info.cls;
+      document.getElementById('statusBadge').textContent = info.label;
+      document.getElementById('modeInfo').className = 'mode-info ' + info.infoCls;
+      document.getElementById('modeInfo').innerHTML = info.desc;
+      ['none','full','both'].forEach(function(m) {
+        document.getElementById('btn' + m.charAt(0).toUpperCase() + m.slice(1))
+          .className = 'mode-btn' + (m === mode ? ' active-' + m : '');
+      });
+      sendToIframe({ type: 'SET_SEEK_MODE', mode: mode });
+      var logType = mode === 'none' ? 'allow' : (mode === 'both' ? 'block' : 'warn');
+      addLog('Đã đổi preventSkippingMode → "' + mode + '"', logType);
+    }
+
+    function resetProgress() {
+      sendToIframe({ type: 'RESET_PROGRESS' });
+      addLog('Đã reset tiến trình xem về 0:00', 'warn');
+    }
+
+    // ── Nhận message từ iframe ──
+    window.addEventListener('message', function (e) {
+      if (!e.data || !e.data.type) return;
+
+      if (e.data.type === 'SEEK_DEBUG') {
+        var d = e.data.data;
+        var msg = `Seek: ${d.from}s ➔ ${d.to}s (Max: ${d.maxReached}s)`;
+        var isBlocked = (d.mode === 'full' && parseFloat(d.to) > parseFloat(d.maxReached) + 0.2) || d.mode === 'both';
+        if (isBlocked) addLog('🚫 CHẶN: ' + msg, 'block');
+        else addLog('✅ CHO PHÉP: ' + msg, 'allow');
+      }
+
+      // Xử lý xAPI Event (Tương tác, trả lời, đúng/sai)
+      if (e.data.type === 'H5P_XAPI_EVENT') {
+        var verb = e.data.data.verb.display['en-US'];
+        var statement = e.data.data;
+        
+        // Gửi về Python Backend để in ra Terminal
+        syncToBackend(statement);
+        
+        if (verb === 'answered') {
+          var score = statement.result ? statement.result.score.raw : 0;
+          var max = statement.result ? statement.result.score.max : 0;
+          var success = statement.result ? statement.result.success : false;
+          var response = statement.result ? statement.result.response : 'N/A';
+          var questionText = statement.object.definition.description ? statement.object.definition.description['en-US'] : 'Câu hỏi';
+          
+          addLog(`🎯 KẾT QUẢ: [${success ? 'ĐÚNG' : 'SAI'}] - ${questionText.replace(/<[^>]*>/g, '')} - Chọn: ${response} (Điểm: ${score}/${max})`, 'allow');
+          
+          // Làm nổi bật JSON quan trọng
+          var ts = new Date().toLocaleTimeString('vi-VN');
+          var header = `\n⭐ [${ts}] KẾT QUẢ QUAN TRỌNG (answered) ⭐\n`;
+          jsonDump.textContent = header + JSON.stringify(statement, null, 2) + "\n" + jsonDump.textContent;
+        } else {
+          // Bỏ qua log một số sự kiện rác để đỡ loãng nếu muốn, ở đây vẫn giữ nhưng in log info
+          if (verb !== 'interacted') {
+             addLog('💡 Sự kiện: ' + verb, 'warn');
+          }
+          dumpJson('Sự kiện: ' + verb, statement);
+        }
+      }
+
+      // Nhận đồng bộ trạng thái mỗi 1 giây
+      if (e.data.type === 'H5P_SYNC_STATE') {
+        var state = e.data.data;
+        document.getElementById('statusBadge').textContent = 
+          modeInfo[currentMode].label.split(' — ')[0] + 
+          ` (Time: ${state.currentTime.toFixed(1)}s / Max: ${state.maxTimeReached.toFixed(1)}s)`;
+      }
+
+      if (e.data.type === 'SEEK_BLOCKER_READY') {
+        addLog('✅ Seek Blocker & xAPI Tracker đã sẵn sàng!', 'allow');
+      }
+    });
+
+    // ── Khởi tạo H5P ──
+    document.addEventListener('DOMContentLoaded', function () {
+      var el = document.getElementById('h5p-container');
+      new H5PStandalone.H5P(el, {
+        h5pJsonPath: './h5p-content',
+        frameJs: 'https://cdn.jsdelivr.net/npm/h5p-standalone@latest/dist/frame.bundle.js',
+        frameCss: 'https://cdn.jsdelivr.net/npm/h5p-standalone@latest/dist/styles/h5p.css',
+        customJs: './seek-blocker.js',
+      }).then(function () {
+        addLog('H5P Player đã load xong!', 'allow');
+      });
+    });
+  </script>
+</body>
+</html>
