@@ -187,14 +187,15 @@
   <!-- JSON Debug Panel -->
   <div class="log-panel">
     <div class="log-header">
-      <span class="log-title">📦 JSON Interaction Data (xAPI)</span>
+      <span class="log-title">📦 JSON Activity Summary <span id="liveIndicator" style="color: #34d399; font-size: 10px; margin-left: 10px; padding: 2px 6px; border: 1px solid #34d399; border-radius: 4px;">● LIVE SYNC</span></span>
       <div style="display: flex; gap: 10px;">
-        <button class="btn-clear-log" onclick="openInNewTab('jsonDump')">📄 Mở Tab mới (Thuần JSON)</button>
+        <button class="btn-clear-log" onclick="window.open('http://localhost:9000/api/logs', '_blank')" style="background: rgba(52,211,153,0.1); color: #34d399;">📊 Tải Báo cáo (Full JSON)</button>
+        <button class="btn-clear-log" id="toggleSyncBtn" onclick="toggleSync()" style="background: rgba(245,158,11,0.1); color: #f59e0b;">Dừng Live</button>
+        <button class="btn-clear-log" onclick="manualReset()" style="background: rgba(ef,44,44,0.1); color: #ef4444;">🗑️ Dọn sạch Log (Server)</button>
         <button class="btn-clear-log" onclick="copyText('jsonDump', this)">Sao chép</button>
-        <button class="btn-clear-log" onclick="document.getElementById('jsonDump').textContent=''">Xóa JSON</button>
       </div>
     </div>
-    <pre class="log-list" id="jsonDump" style="color: #a5b4fc; margin: 0; padding: 10px; max-height: 250px; font-size: 11px; white-space: pre-wrap; word-wrap: break-word;"></pre>
+    <pre class="log-list" id="jsonDump" style="color: #a5b4fc; margin: 0; padding: 10px; max-height: 400px; font-size: 11px; white-space: pre-wrap; word-wrap: break-word; overflow-y: auto;"></pre>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/h5p-standalone@latest/dist/main.bundle.js"></script>
@@ -202,6 +203,55 @@
     var logList = document.getElementById('logList');
     var jsonDump = document.getElementById('jsonDump');
     var currentMode = 'full';
+    var isSyncing = true;
+    var syncInterval;
+
+    function toggleSync() {
+      isSyncing = !isSyncing;
+      var btn = document.getElementById('toggleSyncBtn');
+      var indicator = document.getElementById('liveIndicator');
+      if (isSyncing) {
+        btn.textContent = 'Dừng Live';
+        btn.style.color = '#f59e0b';
+        indicator.style.opacity = '1';
+        startLiveSync();
+      } else {
+        btn.textContent = 'Bật Live';
+        btn.style.color = '#34d399';
+        indicator.style.opacity = '0.3';
+        clearInterval(syncInterval);
+      }
+    }
+
+    function startLiveSync() {
+      if (syncInterval) clearInterval(syncInterval);
+      syncInterval = setInterval(fetchLiveLogs, 2000); // 2 giây fetch 1 lần
+      fetchLiveLogs();
+    }
+
+    function manualReset() {
+      if (confirm('Bạn có chắc chắn muốn XÓA SẠCH toàn bộ log trên Server không?')) {
+        syncToBackend({ type: 'reset' });
+        document.getElementById('jsonDump').textContent = '[]';
+        document.getElementById('logList').innerHTML = '<div class="log-item info">[ready] Đã dọn sạch log theo yêu cầu.</div>';
+        addLog('Đã gửi lệnh xóa sạch Log trên Server', 'warn');
+      }
+    }
+
+    function fetchLiveLogs() {
+      if (!isSyncing) return;
+      fetch('http://localhost:9000/api/logs')
+        .then(res => res.json())
+        .then(data => {
+          // Hiện 50 bản ghi mới nhất, đảo ngược lại để cái mới nhất lên đầu
+          var newContent = JSON.stringify(data.slice(-50).reverse(), null, 2);
+          if (jsonDump.dataset.lastContent !== newContent) {
+            jsonDump.textContent = newContent;
+            jsonDump.dataset.lastContent = newContent;
+          }
+        })
+        .catch(err => console.error('Lỗi sync:', err));
+    }
 
     // ── Copy Function ──
     function copyText(elementId, btn) {
@@ -295,73 +345,109 @@
       addLog('Đã reset tiến trình xem về 0:00', 'warn');
     }
 
+    var seekDebounceTimer = null;
+
     // ── Nhận message từ iframe ──
     window.addEventListener('message', function (e) {
       if (!e.data || !e.data.type) return;
 
       if (e.data.type === 'SEEK_DEBUG') {
-        var d = e.data.data;
-        var msg = `Seek: ${d.from}s ➔ ${d.to}s (Max: ${d.maxReached}s)`;
-        var isBlocked = (d.mode === 'full' && parseFloat(d.to) > parseFloat(d.maxReached) + 0.2) || d.mode === 'both';
-        if (isBlocked) addLog('🚫 CHẶN: ' + msg, 'block');
-        else addLog('✅ CHO PHÉP: ' + msg, 'allow');
+        if (seekDebounceTimer) clearTimeout(seekDebounceTimer);
+        
+        seekDebounceTimer = setTimeout(function() {
+          var d = e.data.data;
+          var msg = `Seek: ${d.from}s ➔ ${d.to}s (Max: ${d.maxReached}s)`;
+          var isBlocked = (d.mode === 'full' && parseFloat(d.to) > parseFloat(d.maxReached) + 0.2) || d.mode === 'both';
+          if (isBlocked) addLog('🚫 CHẶN: ' + msg, 'block');
+          else addLog('✅ CHO PHÉP: ' + msg, 'allow');
 
-        // Ghi log hành động TUA (seek) sang server JSON riêng
-        syncToBackend({
-          action: 'seek_attempt',
-          mode: d.mode,
-          from: d.from,
-          to: d.to,
-          maxReached: d.maxReached,
-          isBlocked: isBlocked
-        });
+          var seekEvent = {
+            type: 'summary',
+            action: 'seek_attempt',
+            mode: d.mode,
+            from: d.from,
+            to: d.to,
+            maxReached: d.maxReached,
+            isBlocked: isBlocked
+          };
+          
+          syncToBackend(seekEvent);
+          dumpJson('HÀNH ĐỘNG: SEEK', seekEvent);
+        }, 300); // Đợi 300ms sau khi ngừng di chuyển mới ghi log
       }
 
-      // Xử lý xAPI Event (Tương tác, trả lời, đúng/sai)
-      if (e.data.type === 'H5P_XAPI_EVENT') {
-        var verb = e.data.data.verb.display['en-US'];
-        var statement = e.data.data;
+      // Xử lý Sự kiện "Sạch" (Đã qua xử lý để làm báo cáo Excel)
+      if (e.data.type === 'H5P_STASH_EVENT') {
+        var stash = e.data.data;
+        var rawStatement = e.data.raw;
         
-        // Gửi về Python Backend để in ra Terminal
-        syncToBackend(statement);
-        
-        if (verb === 'answered') {
-          var score = statement.result ? statement.result.score.raw : 0;
-          var max = statement.result ? statement.result.score.max : 0;
-          var success = statement.result ? statement.result.success : false;
-          var response = statement.result ? statement.result.response : 'N/A';
-          var questionText = statement.object.definition.description ? statement.object.definition.description['en-US'] : 'Câu hỏi';
-          
-          addLog(`🎯 KẾT QUẢ: [${success ? 'ĐÚNG' : 'SAI'}] - ${questionText.replace(/<[^>]*>/g, '')} - Chọn: ${response} (Điểm: ${score}/${max})`, 'allow');
-          
-          // Làm nổi bật JSON quan trọng
-          var ts = new Date().toLocaleTimeString('vi-VN');
-          var header = `\n⭐ [${ts}] KẾT QUẢ QUAN TRỌNG (answered) ⭐\n`;
-          jsonDump.textContent = header + JSON.stringify(statement, null, 2) + "\n" + jsonDump.textContent;
-        } else {
-          // Bỏ qua log một số sự kiện rác để đỡ loãng nếu muốn, ở đây vẫn giữ nhưng in log info
-          if (verb !== 'interacted') {
-             addLog('💡 Sự kiện: ' + verb, 'warn');
-          }
-          dumpJson('Sự kiện: ' + verb, statement);
+        // 1. Gửi bản tóm tắt (Summary) để làm báo cáo Excel
+        syncToBackend({ type: 'summary', ...stash });
+
+        // 2. Gửi bản gốc (Raw xAPI)
+        if (rawStatement) syncToBackend({ type: 'raw_xapi', ...rawStatement });
+
+        // 3. Hiển thị lên giao diện Web
+        dumpJson('SỰ KIỆN: ' + stash.action.toUpperCase(), stash);
+
+        if (stash.action === 'answered') {
+          addLog(`🎯 KẾT QUẢ: [${stash.correct ? 'ĐÚNG' : 'SAI'}] - ${stash.question} - Chọn: ${stash.answer} (Điểm: ${stash.score}/${stash.maxScore})`, 'allow');
+        } else if (stash.action !== 'interacted') {
+          addLog('💡 Sự kiện: ' + stash.action, 'warn');
         }
       }
 
       // Nhận đồng bộ trạng thái mỗi 1 giây
       if (e.data.type === 'H5P_SYNC_STATE') {
         var state = e.data.data;
-        document.getElementById('statusBadge').textContent = 
-          modeInfo[currentMode].label.split(' — ')[0] + 
-          ` (Time: ${state.currentTime.toFixed(1)}s / Max: ${state.maxTimeReached.toFixed(1)}s)`;
+        var statusBadge = document.getElementById('statusBadge');
+        
+        // Cập nhật nhãn trạng thái và tiến độ
+        var progressText = ` (Time: ${state.currentTime.toFixed(1)}s / Max: ${state.maxTimeReached.toFixed(1)}s / Total: ${state.duration.toFixed(1)}s)`;
+        var questionsText = state.totalQuestions > 0 ? ` | Q: ${state.answeredCount}/${state.totalQuestions}` : '';
+        
+        statusBadge.textContent = modeInfo[currentMode].label.split(' — ')[0] + progressText + questionsText;
+        
+        // Hiển thị trạng thái Hoàn thành (Completion)
+        if (state.isCompleted) {
+          statusBadge.className = 'status-badge status-none';
+          statusBadge.textContent = '✅ ĐÃ HOÀN THÀNH ' + progressText + questionsText;
+          
+          // Nếu chưa log xong thì gửi 1 cái log "Kết thúc" cuối cùng
+          if (window.lastCompletionLogged !== true) {
+            var completionEvent = { 
+              type: 'summary', 
+              action: 'completed_all', 
+              timestamp: new Date().toISOString(),
+              totalQuestions: state.totalQuestions,
+              answeredCount: state.answeredCount,
+              currentTime: state.currentTime
+            };
+            syncToBackend(completionEvent);
+            window.lastCompletionLogged = true;
+            
+            addLog('🏆 TUYỆT VỜI: Bạn đã hoàn thành toàn bộ nội dung học tập!', 'allow');
+            dumpJson('HOÀN THÀNH TOÀN BỘ', completionEvent);
+          }
+        } else {
+          statusBadge.className = 'status-badge ' + modeInfo[currentMode].cls;
+          window.lastCompletionLogged = false;
+        }
       }
 
       if (e.data.type === 'SEEK_BLOCKER_READY') {
-        addLog('✅ Seek Blocker & xAPI Tracker đã sẵn sàng!', 'allow');
+        addLog('✅ Hệ thống Telemetry Nâng cao đã sẵn sàng!', 'allow');
       }
     });
 
     // ── Khởi tạo H5P ──
     document.addEventListener('DOMContentLoaded', function () {
+      // Bắt đầu Live Sync từ file thật trên server
+      startLiveSync();
+
+      // Mỗi lần load lại trang (F5), thực hiện xoá sạch log cũ trên server
+      syncToBackend({ type: 'reset' });
+
       var el = document.getElementById('h5p-container');
       new H5PStandalone.H5P(el, {
         h5pJsonPath: './h5p-content',

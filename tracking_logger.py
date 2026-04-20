@@ -5,11 +5,12 @@ import os
 from datetime import datetime
 
 PORT = 9000
-LOG_FILE = "student_tracking.json"
+PORT = 9000
+LOG_FILE = "activity_summary.json"
 
 class TrackingLogger(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
-        # Handle CORS preflight for the new domain
+        # Handle CORS preflight
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
@@ -17,8 +18,8 @@ class TrackingLogger(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        # Endpoint API để lấy đọc toàn bộ logs
-        if self.path == '/api/logs':
+        # API trả về nội dung file Log duy nhất
+        if self.path.startswith('/api/logs'):
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_header('Access-Control-Allow-Origin', '*')
@@ -30,8 +31,6 @@ class TrackingLogger(http.server.SimpleHTTPRequestHandler):
             else:
                 self.wfile.write(b'[]')
             return
-            
-        # Các đường dẫn khác sẽ hoạt động như Web Server thường
         return super().do_GET()
 
     def do_POST(self):
@@ -40,48 +39,49 @@ class TrackingLogger(http.server.SimpleHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             
             try:
-                # Parse the incoming JSON
                 data = json.loads(post_data)
+                log_type = data.get('type', 'raw')
                 
-                # Append to our local JSON file log
-                logs = []
-                if os.path.exists(LOG_FILE):
-                    try:
-                        with open(LOG_FILE, 'r', encoding='utf-8') as f:
-                            logs = json.load(f)
-                    except ValueError:
-                        pass # File is empty or invalid
-                
-                # Add timestamp server-side
-                data['server_time'] = datetime.now().isoformat()
-                logs.append(data)
-                
-                # Write back to file securely
-                with open(LOG_FILE, 'w', encoding='utf-8') as f:
-                    json.dump(logs, f, ensure_ascii=False, indent=2)
-                
-                event_type = data.get('action') or data.get('event_type') or 'unknown'
-                print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] Đã ghi log sự kiện: {event_type} -> {LOG_FILE}")
+                if log_type == 'reset':
+                    with open(LOG_FILE, 'w', encoding='utf-8') as f:
+                        json.dump([], f)
+                    print(f"🧹 [{datetime.now().strftime('%H:%M:%S')}] Đã dọn sạch dữ liệu Log (Reset).")
+                else:
+                    # Ghi log duy nhất
+                    self.save_to_file(LOG_FILE, data)
+                    action = data.get('action') or data.get('verb', {}).get('display', {}).get('en-US', 'unknown')
+                    print(f"✅ [{datetime.now().strftime('%H:%M:%S')}] Logged: {action}")
                 
             except Exception as e:
                 print(f"❌ Lỗi ghi log: {e}")
             
-            # Respond with success to client
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             self.wfile.write(b'{"status":"success"}')
             return
+        self.send_error(404)
+
+    def save_to_file(self, target_file, data):
+        """Hàm lưu log vào file JSON"""
+        logs = []
+        if os.path.exists(target_file):
+            try:
+                with open(target_file, 'r', encoding='utf-8') as f:
+                    logs = json.load(f)
+            except: pass
         
-        # Fallback for other paths
-        self.send_error(404, "Endpoint not found")
+        if 'server_time' not in data:
+            data['server_time'] = datetime.now().isoformat()
+            
+        logs.append(data)
+        with open(target_file, 'w', encoding='utf-8') as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
 
 print("="*60)
-print(f"🚀 Tracking Logger Server (Tên miền phụ) đang chạy!")
-print(f"📥 Nơi NHẬN dữ liệu (POST): http://localhost:{PORT}/log")
-print(f"📤 Nơi ĐỌC API log   (GET):  http://localhost:{PORT}/api/logs")
-print(f"📂 File lưu JSON thực tế:    {LOG_FILE}")
+print(f"🚀 H5P Activity Tracker đang chạy tại Port {PORT}")
+print(f"📂 File báo cáo: {LOG_FILE}")
 print("="*60)
 
 socketserver.TCPServer.allow_reuse_address = True
