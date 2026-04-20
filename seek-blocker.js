@@ -70,7 +70,7 @@
           window.parent.postMessage({
             type: 'H5P_SYNC_STATE',
             data: {
-              currentTime: inst.video.getCurrentTime(),
+              currentTime: inst.video.getCurrentTimeexternalDispatcher(),
               maxTimeReached: inst.maxTimeReached || 0,
               duration: inst.video.getDuration ? inst.video.getDuration() : 0,
               mode: inst.preventSkippingMode || 'none'

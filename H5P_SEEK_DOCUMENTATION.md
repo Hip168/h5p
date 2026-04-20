@@ -67,16 +67,42 @@ Trong quá trình học viên chạy video, các Event sau sẽ được emit:
 
 ---
 
-## 4. Luồng xử lý Dữ liệu & Backend Synchronization (Data Flow)
+## 4. Luồng xử lý Dữ liệu & Decoupled Backend Logic
 
-Vì H5P Sandbox chạy bên trong IFrame, quy chuẩn bảo mật (Same-Origin Policy) không cho phép Node cha can thiệp trực tiếp. 
+Vì H5P Sandbox chạy biệt lập bên trong IFrame, hệ thống sử dụng kiến trúc **Host-Proxy** để đồng bộ dữ liệu về môi trường bên ngoài.
 
-**Kiến trúc Giao tiếp (Communication Architecture):**
-1.  **State Polling (Iframe -> Wrapper):** 
-    Mỗi 1000ms (1s), Script chạy vòng lặp đọc `video.getCurrentTime()` và `maxTimeReached`, gom thành Object JSON cấu trúc `H5P_SYNC_STATE`, sau đó bắn ra Wrapper `index.html` thông qua `postMessage`.
-2.  **Event Driven (Iframe -> Wrapper):**
-    Ngay khi Event Bus bắt được gói xAPI, nó đóng gói dưới type `H5P_XAPI_EVENT` và bắn thẳng ra Wrapper.
-3.  **Network Transport (Wrapper -> Backend):**
-    Tại tầng Host UI (`index.html`), hệ thống lắng nghe IPC. Khi có gói Tin `H5P_XAPI_EVENT`, Wrapper gọi hàm `fetch()` sử dụng method `POST` tới API `/log-interaction` của Backend Python.
-4.  **Logging Service (Python Backend):**
-    Server (`range_server.py`) sẽ deserialize gói JSON, trích xuất verb (loại event) và Dump output formatted ra stdout (Terminal), sẵn sàng cho các tiến trình ELK stack cấu hình lưu trữ Log.
+### Kiến trúc Giao tiếp (Communication & Transport):
+1.  **IPC Bridge (IFrame -> Host):** `seek-blocker.js` sử dụng `postMessage` để đẩy các `H5P_XAPI_EVENT` và `SEEK_DEBUG` ra lớp bọc (Wrapper) ngoài cùng.
+2.  **Host UI Layer (`index.html`):** Lắng nghe sự kiện IPC toàn cục. Khi nhận được tín hiệu, Host sẽ thực thi chuyển tiếp dữ liệu (Forwarding) qua phương thức `fetch()` tới Domain Tracking riêng biệt.
+3.  **Cross-Origin Tracking Server (`tracking_logger.py`):** Một dịch vụ microservice độc lập chạy tại cổng `9000`, chịu trách nhiệm xử lý nghiệp vụ lưu trữ (Persistence).
+
+---
+
+## 5. Đặc tả API dành cho Tracking Server (Port 9000)
+
+Dịch vụ `tracking_logger.py` cung cấp hai Endpoint logic dành cho việc ghi và đọc dữ liệu log:
+
+### 1. Ingestion API (POST `/log`)
+Sử dụng để nhận dữ liệu từ Client-side.
+*   **Method:** `POST`
+*   **Logic:** Deserialize JSON, bổ sung thuộc tính `server_time` (ISO timestamp) và thực thi Append vào tệp vật lý `student_tracking.json`.
+*   **Persistence:** Đảm bảo tính toàn vẹn dữ liệu bằng cơ chế Load-Modify-Write trên tệp JSON phẳng.
+
+### 2. Retrieval API (GET `/api/logs`)
+Cung cấp khả năng truy xuất dữ liệu real-time dành cho Monitoring Layer hoặc Admin Dashboard.
+*   **Method:** `GET`
+*   **Response:** Trả về toàn bộ lịch sử tương tác dưới định dạng mảng JSON (`Array<Object>`).
+*   **Security:** Hỗ trợ đầy đủ CORS Header (`Access-Control-Allow-Origin: *`) phục vụ việc tích hợp đa nền tảng (Dashboard, XBlock).
+
+---
+
+## 6. Hướng dẫn Triển khai & Vận hành (Deployment)
+
+Hệ thống yêu cầu chạy song song hai tiến trình server để tách biệt luồng Statics và luồng Telemetry:
+
+1.  **Static & Range Server (Port 8000):** 
+    `python3 range_server.py`
+    *   Nhiệm vụ: Cung cấp tài nguyên tĩnh và nội dung Video (hỗ trợ HTTP Range).
+2.  **Tracking Logger Server (Port 9000):** 
+    `python3 tracking_logger.py`
+    *   Nhiệm vụ: Duy trì Persistence Layer và API Endpoint cho dữ liệu xAPI.

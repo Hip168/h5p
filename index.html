@@ -231,9 +231,9 @@
       window.open(url, '_blank');
     }
 
-    // Gửi dữ liệu về Python Backend
+    // Gửi dữ liệu về Server Tracking (Domain khác: Port 9000)
     function syncToBackend(data) {
-      fetch('/log-interaction', {
+      fetch('http://localhost:9000/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -305,6 +305,16 @@
         var isBlocked = (d.mode === 'full' && parseFloat(d.to) > parseFloat(d.maxReached) + 0.2) || d.mode === 'both';
         if (isBlocked) addLog('🚫 CHẶN: ' + msg, 'block');
         else addLog('✅ CHO PHÉP: ' + msg, 'allow');
+
+        // Ghi log hành động TUA (seek) sang server JSON riêng
+        syncToBackend({
+          action: 'seek_attempt',
+          mode: d.mode,
+          from: d.from,
+          to: d.to,
+          maxReached: d.maxReached,
+          isBlocked: isBlocked
+        });
       }
 
       // Xử lý xAPI Event (Tương tác, trả lời, đúng/sai)

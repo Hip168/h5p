@@ -2,37 +2,14 @@ import http.server
 import socketserver
 import os
 import re
-import json
 
 PORT = 8000
 
-class RangeRequestHandler(http.server.SimpleHTTPRequestHandler):
-    def do_POST(self):
-        # API nhận Log JSON từ trình duyệt
-        if self.path == '/log-interaction':
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            try:
-                data = json.loads(post_data)
-                print("\n" + "="*50)
-                print(f"📥 NHẬN DỮ LIỆU xAPI: {data.get('verb', {}).get('display', {}).get('en-US', 'unknown')}")
-                print("="*50)
-                print(json.dumps(data, indent=2, ensure_ascii=False))
-                print("="*50 + "\n")
-                
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(b'{"status":"ok"}')
-            except Exception as e:
-                print(f"❌ Lỗi xử lý JSON: {e}")
-                self.send_error(400, "Invalid JSON")
-            return
-
+class VideoRangeHandler(http.server.SimpleHTTPRequestHandler):
+    # Enable CORS for the local dev environment
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         super().end_headers()
 
@@ -40,6 +17,7 @@ class RangeRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
+    # Byte-range support for videos (Safari/Chrome requires this)
     def send_head(self):
         path = self.translate_path(self.path)
         if os.path.isdir(path):
@@ -75,6 +53,9 @@ class RangeRequestHandler(http.server.SimpleHTTPRequestHandler):
         except Exception:
             return super().send_head()
 
-print(f"🚀 Server đang chạy tại http://localhost:{PORT}")
-with socketserver.TCPServer(("", PORT), RangeRequestHandler) as httpd:
+print("="*60)
+print(f"🎬 Video Static Server đang chạy tại http://localhost:{PORT}")
+print("="*60)
+socketserver.TCPServer.allow_reuse_address = True
+with socketserver.TCPServer(("", PORT), VideoRangeHandler) as httpd:
     httpd.serve_forever()
