@@ -176,7 +176,9 @@
       answer: '',
       correct: null,
       score: null,
-      maxScore: null
+      maxScore: null,
+      answeredCount: state.answeredIds.size,
+      totalQuestions: state.totalQuestions
     };
     // Gộp thêm dữ liệu extra nếu có
     Object.assign(data, extraData);
@@ -188,22 +190,36 @@
   }
 
   function initializeContentInfo() {
-    if (!H5P.instances || H5P.instances.length === 0) return;
-    var inst = H5P.instances[0];
+    if (state.totalQuestions > 0) return; // Đã lấy được rồi thì thôi
 
-    // Xác định loại content
-    if (inst instanceof H5P.InteractiveVideo) {
-      state.contentType = 'InteractiveVideo';
-      state.totalQuestions = (inst.interactions || []).filter(function(i) {
-        // Chỉ đếm các tương tác là tác vụ (có thư mục con và không phải label đơn thuần)
-        return i.action && i.action.library && !i.action.library.includes('H5P.Label');
-      }).length;
-    } else {
-      state.contentType = 'Other';
-      // Thử đếm số câu hỏi cho các dạng khác (ví dụ QuestionSet)
-      state.totalQuestions = inst.questions ? inst.questions.length : 0;
+    // Cách đáng tin cậy nhất: Đọc thẳng từ file cấu hình của H5P
+    fetch('h5p-content/content/content.json')
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data && data.interactiveVideo && data.interactiveVideo.assets && data.interactiveVideo.assets.interactions) {
+          var count = data.interactiveVideo.assets.interactions.filter(function(i) {
+            return i.action && i.action.library && !i.action.library.includes('H5P.Label');
+          }).length;
+          
+          
+          if (count > 0) {
+            state.totalQuestions = count;
+            console.log('[SeekBlocker] Đã đọc từ content.json:', state.totalQuestions, 'câu hỏi.');
+          }
+        }
+      })
+      .catch(function(e) {
+        console.warn('[SeekBlocker] Không thể đọc content.json, sẽ thử đếm qua instances.', e);
+      });
+
+    // Luôn giữ ít nhất bằng số câu đã làm
+    if (state.answeredIds.size > state.totalQuestions) {
+      state.totalQuestions = state.answeredIds.size;
     }
-    console.log('[SeekBlocker] Content Type:', state.contentType, '| Total Questions:', state.totalQuestions);
+
+    if (state.totalQuestions === 0) {
+      setTimeout(initializeContentInfo, 1500);
+    }
   }
 
   function getCurrentTime() {

@@ -67,10 +67,18 @@
 
     /* Status Badge */
     .status-badge {
-      font-size: 12px; font-weight: 700; padding: 5px 14px;
-      border-radius: 20px; transition: all 0.3s ease; white-space: nowrap;
+      font-size: 13px; font-weight: 800; padding: 8px 24px;
+      border-radius: 50px; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+      white-space: nowrap; display: inline-flex; align-items: center; gap: 8px;
+      letter-spacing: 0.5px; text-transform: uppercase;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
     }
-    .status-none { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(52,211,153,0.3); }
+    .status-none { 
+      background: rgba(16,185,129,0.1); 
+      color: #10b981; 
+      border: 2px solid #10b981;
+      box-shadow: 0 0 15px rgba(16,185,129,0.2);
+    }
     .status-full { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
     .status-both { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
 
@@ -120,8 +128,8 @@
     .log-title { font-size: 12px; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
     .btn-clear-log { font-size: 11px; color: #6e7681; background: none; border: none; cursor: pointer; padding: 2px 8px; border-radius: 4px; transition: color 0.2s; }
     .btn-clear-log:hover { color: #c9d1d9; }
-    .log-list { padding: 10px; max-height: 180px; overflow-y: auto; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
-    .log-item { padding: 3px 8px; border-radius: 4px; margin-bottom: 2px; animation: fadeInLog 0.2s ease; }
+    .log-list { padding: 10px; max-height: 480px; overflow-y: auto; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+    .log-item { padding: 4px 10px; border-radius: 4px; margin-bottom: 3px; animation: fadeInLog 0.2s ease; border-left: 3px solid transparent; }
     @keyframes fadeInLog { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
     .log-item.block { background: rgba(239,68,68,0.1); color: #f87171; }
     .log-item.allow { background: rgba(16,185,129,0.1); color: #34d399; }
@@ -153,10 +161,6 @@
 
     <div class="divider"></div>
 
-    <div id="statusBadge" class="status-badge status-full">🔒 full — chặn tua tới</div>
-
-    <div class="divider"></div>
-
     <button class="btn-reset" id="btnReset" onclick="resetProgress()" title="Đưa video và mốc thời gian đã xem về 0">↺ Reset</button>
   </div>
 
@@ -170,293 +174,149 @@
     <div id="h5p-container"></div>
   </div>
 
-  <!-- Log Panel -->
-  <div class="log-panel">
+  <!-- Event Log Panel -->
+  <div class="log-panel" style="margin-bottom: 60px;">
     <div class="log-header">
-      <span class="log-title">📋 Event Log</span>
+      <span class="log-title">📋 Professional Event Log</span>
       <div style="display: flex; gap: 10px;">
         <button class="btn-clear-log" onclick="copyText('logList', this)">Sao chép</button>
         <button class="btn-clear-log" onclick="logList.innerHTML=''">Xóa log</button>
       </div>
     </div>
     <div class="log-list" id="logList">
-      <div class="log-item info">[ready] Đang khởi tạo H5P Player với preventSkippingMode = "full"...</div>
+      <div class="log-item info">🚀 [0.0s] Hệ thống đã sẵn sàng.</div>
     </div>
-  </div>
-
-  <!-- JSON Debug Panel -->
-  <div class="log-panel">
-    <div class="log-header">
-      <span class="log-title">📦 JSON Activity Summary <span id="liveIndicator" style="color: #34d399; font-size: 10px; margin-left: 10px; padding: 2px 6px; border: 1px solid #34d399; border-radius: 4px;">● LIVE SYNC</span></span>
-      <div style="display: flex; gap: 10px;">
-        <button class="btn-clear-log" onclick="window.open('http://localhost:9000/api/logs', '_blank')" style="background: rgba(52,211,153,0.1); color: #34d399;">📊 Tải Báo cáo (Full JSON)</button>
-        <button class="btn-clear-log" id="toggleSyncBtn" onclick="toggleSync()" style="background: rgba(245,158,11,0.1); color: #f59e0b;">Dừng Live</button>
-        <button class="btn-clear-log" onclick="manualReset()" style="background: rgba(ef,44,44,0.1); color: #ef4444;">🗑️ Dọn sạch Log (Server)</button>
-        <button class="btn-clear-log" onclick="copyText('jsonDump', this)">Sao chép</button>
-      </div>
-    </div>
-    <pre class="log-list" id="jsonDump" style="color: #a5b4fc; margin: 0; padding: 10px; max-height: 400px; font-size: 11px; white-space: pre-wrap; word-wrap: break-word; overflow-y: auto;"></pre>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/h5p-standalone@latest/dist/main.bundle.js"></script>
   <script>
     var logList = document.getElementById('logList');
-    var jsonDump = document.getElementById('jsonDump');
     var currentMode = 'full';
-    var isSyncing = true;
-    var syncInterval;
 
-    function toggleSync() {
-      isSyncing = !isSyncing;
-      var btn = document.getElementById('toggleSyncBtn');
-      var indicator = document.getElementById('liveIndicator');
-      if (isSyncing) {
-        btn.textContent = 'Dừng Live';
-        btn.style.color = '#f59e0b';
-        indicator.style.opacity = '1';
-        startLiveSync();
-      } else {
-        btn.textContent = 'Bật Live';
-        btn.style.color = '#34d399';
-        indicator.style.opacity = '0.3';
-        clearInterval(syncInterval);
-      }
-    }
 
-    function startLiveSync() {
-      if (syncInterval) clearInterval(syncInterval);
-      syncInterval = setInterval(fetchLiveLogs, 2000); // 2 giây fetch 1 lần
-      fetchLiveLogs();
-    }
-
-    function manualReset() {
-      if (confirm('Bạn có chắc chắn muốn XÓA SẠCH toàn bộ log trên Server không?')) {
-        syncToBackend({ type: 'reset' });
-        document.getElementById('jsonDump').textContent = '[]';
-        document.getElementById('logList').innerHTML = '<div class="log-item info">[ready] Đã dọn sạch log theo yêu cầu.</div>';
-        addLog('Đã gửi lệnh xóa sạch Log trên Server', 'warn');
-      }
-    }
-
-    function fetchLiveLogs() {
-      if (!isSyncing) return;
-      fetch('http://localhost:9000/api/logs')
-        .then(res => res.json())
-        .then(data => {
-          // Hiện 50 bản ghi mới nhất, đảo ngược lại để cái mới nhất lên đầu
-          var newContent = JSON.stringify(data.slice(-50).reverse(), null, 2);
-          if (jsonDump.dataset.lastContent !== newContent) {
-            jsonDump.textContent = newContent;
-            jsonDump.dataset.lastContent = newContent;
-          }
-        })
-        .catch(err => console.error('Lỗi sync:', err));
-    }
-
-    // ── Copy Function ──
-    function copyText(elementId, btn) {
-      var el = document.getElementById(elementId);
-      var text = elementId === 'logList' ? el.innerText : el.textContent;
-      
-      navigator.clipboard.writeText(text).then(function() {
-        var originalText = btn.textContent;
-        btn.textContent = '✅ Đã chép!';
-        btn.style.color = '#34d399';
-        setTimeout(function() {
-          btn.textContent = originalText;
-          btn.style.color = '';
-        }, 1500);
-      });
-    }
-
-    // Mở JSON trong cửa sổ mới (Thuần JSON)
-    function openInNewTab(elementId) {
-      var text = document.getElementById(elementId).textContent;
-      // Tìm JSON đầu tiên trong text (vì dumpJson có thêm header --- [Time] ---)
-      var jsonMatch = text.match(/\{[\s\S]*\}/);
-      var jsonStr = jsonMatch ? jsonMatch[0] : text;
-      
-      var blob = new Blob([jsonStr], { type: 'application/json' });
-      var url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    }
-
-    // Gửi dữ liệu về Server Tracking (Domain khác: Port 9000)
-    function syncToBackend(data) {
-      fetch('http://localhost:9000/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      }).catch(err => console.error('Lỗi sync backend:', err));
-    }
-
-    // ── Logging ──
-    function addLog(msg, type) {
-      var ts = new Date().toLocaleTimeString('vi-VN');
+    // ── Logging thông minh ──
+    function addLog(msg, type, videoTime) {
       var item = document.createElement('div');
       item.className = 'log-item ' + (type || 'info');
-      item.textContent = '[' + ts + '] ' + msg;
+      
+      var timePrefix = videoTime !== undefined ? `[${parseFloat(videoTime).toFixed(1)}s]` : `[${new Date().toLocaleTimeString('vi-VN')}]`;
+      item.textContent = `${timePrefix} ${msg}`;
+      
       logList.appendChild(item);
       logList.scrollTop = logList.scrollHeight;
     }
 
-    function dumpJson(title, obj) {
-      var ts = new Date().toLocaleTimeString('vi-VN');
-      var text = `\n--- [${ts}] ${title} ---\n`;
-      text += JSON.stringify(obj, null, 2);
-      jsonDump.textContent = text + jsonDump.textContent; // Đẩy lên đầu
+    function copyText(elementId, btn) {
+      var el = document.getElementById(elementId);
+      navigator.clipboard.writeText(el.innerText || el.textContent).then(function() {
+        var originalText = btn.textContent;
+        btn.textContent = '✅ Đã chép!';
+        btn.style.color = '#34d399';
+        setTimeout(function() { btn.textContent = originalText; btn.style.color = ''; }, 1500);
+      });
     }
 
-    // ── Lấy H5P iframe ──
-    function getIframe() {
-      return document.querySelector('iframe.h5p-iframe');
-    }
-
+    function getIframe() { return document.querySelector('iframe.h5p-iframe'); }
     function sendToIframe(msg) {
       var iframe = getIframe();
       if (iframe && iframe.contentWindow) iframe.contentWindow.postMessage(msg, '*');
     }
 
-    // ── Đổi chế độ ──
+    // ── Điều khiển ──
     var modeInfo = {
-      'none': { label: '🔓 none — tua tự do', cls: 'status-none', infoCls: 'info-none', desc: '<strong>none:</strong> Không chặn gì cả.' },
-      'full': { label: '🔒 full — chặn tua tới', cls: 'status-full', infoCls: 'info-full', desc: '<strong>full:</strong> Chỉ có thể seek ngược về phần đã xem.' },
-      'both': { label: '⛔ both — khóa hoàn toàn', cls: 'status-both', infoCls: 'info-both', desc: '<strong>both:</strong> Thanh điều hướng bị khóa hoàn toàn.' }
+      'none': { label: '🔓 none', cls: 'status-none', desc: '<strong>none:</strong> Không chặn gì cả.' },
+      'full': { label: '🔒 full', cls: 'status-full', desc: '<strong>full:</strong> Chỉ có thể seek ngược.' },
+      'both': { label: '⛔ both', cls: 'status-both', desc: '<strong>both:</strong> Khóa hoàn toàn.' }
     };
 
     function setMode(mode) {
       currentMode = mode;
       var info = modeInfo[mode];
-      document.getElementById('statusBadge').className = 'status-badge ' + info.cls;
-      document.getElementById('statusBadge').textContent = info.label;
-      document.getElementById('modeInfo').className = 'mode-info ' + info.infoCls;
+      document.getElementById('modeInfo').className = 'mode-info info-' + mode;
       document.getElementById('modeInfo').innerHTML = info.desc;
-      ['none','full','both'].forEach(function(m) {
-        document.getElementById('btn' + m.charAt(0).toUpperCase() + m.slice(1))
-          .className = 'mode-btn' + (m === mode ? ' active-' + m : '');
+      
+      ['btnNone','btnFull','btnBoth'].forEach(id => {
+          document.getElementById(id).classList.remove('active-none','active-full','active-both');
+          if (id.toLowerCase().includes(mode)) document.getElementById(id).classList.add('active-' + mode);
       });
+
       sendToIframe({ type: 'SET_SEEK_MODE', mode: mode });
-      var logType = mode === 'none' ? 'allow' : (mode === 'both' ? 'block' : 'warn');
-      addLog('Đã đổi preventSkippingMode → "' + mode + '"', logType);
+      addLog(`Hệ thống: Chuyển sang chế độ "${mode}"`, 'warn');
     }
 
     function resetProgress() {
       sendToIframe({ type: 'RESET_PROGRESS' });
-      addLog('Đã reset tiến trình xem về 0:00', 'warn');
+      logList.innerHTML = '<div class="log-item info">🚀 [0.0s] Hệ thống đã reset tiến trình.</div>';
     }
 
     var seekDebounceTimer = null;
 
-    // ── Nhận message từ iframe ──
+    // ── XỬ LÝ SỰ KIỆN TỪ IFRAME ──
     window.addEventListener('message', function (e) {
       if (!e.data || !e.data.type) return;
 
+      // 1. Chặn tua
       if (e.data.type === 'SEEK_DEBUG') {
         if (seekDebounceTimer) clearTimeout(seekDebounceTimer);
-        
         seekDebounceTimer = setTimeout(function() {
           var d = e.data.data;
           var msg = `Seek: ${d.from}s ➔ ${d.to}s (Max: ${d.maxReached}s)`;
           var isBlocked = (d.mode === 'full' && parseFloat(d.to) > parseFloat(d.maxReached) + 0.2) || d.mode === 'both';
-          if (isBlocked) addLog('🚫 CHẶN: ' + msg, 'block');
-          else addLog('✅ CHO PHÉP: ' + msg, 'allow');
-
-          var seekEvent = {
-            type: 'summary',
-            action: 'seek_attempt',
-            mode: d.mode,
-            from: d.from,
-            to: d.to,
-            maxReached: d.maxReached,
-            isBlocked: isBlocked
-          };
-          
-          syncToBackend(seekEvent);
-          dumpJson('HÀNH ĐỘNG: SEEK', seekEvent);
-        }, 300); // Đợi 300ms sau khi ngừng di chuyển mới ghi log
+          if (isBlocked) addLog('🚫 CHẶN: ' + msg, 'block', d.from);
+          else addLog('✅ CHO PHÉP: ' + msg, 'allow', d.from);
+        }, 300);
       }
 
-      // Xử lý Sự kiện "Sạch" (Đã qua xử lý để làm báo cáo Excel)
+      // 2. Các sự kiện tương tác (Stash)
       if (e.data.type === 'H5P_STASH_EVENT') {
         var stash = e.data.data;
-        var rawStatement = e.data.raw;
-        
-        // 1. Gửi bản tóm tắt (Summary) để làm báo cáo Excel
-        syncToBackend({ type: 'summary', ...stash });
-
-        // 2. Gửi bản gốc (Raw xAPI)
-        if (rawStatement) syncToBackend({ type: 'raw_xapi', ...rawStatement });
-
-        // 3. Hiển thị lên giao diện Web
-        dumpJson('SỰ KIỆN: ' + stash.action.toUpperCase(), stash);
+        var msg = `Sự kiện: ${stash.action}`;
+        var type = 'info';
 
         if (stash.action === 'answered') {
-          addLog(`🎯 KẾT QUẢ: [${stash.correct ? 'ĐÚNG' : 'SAI'}] - ${stash.question} - Chọn: ${stash.answer} (Điểm: ${stash.score}/${stash.maxScore})`, 'allow');
-        } else if (stash.action !== 'interacted') {
-          addLog('💡 Sự kiện: ' + stash.action, 'warn');
+          msg = `🎯 TRẢ LỜI: "${stash.question}" ➔ "${stash.answer}" (${stash.correct ? 'ĐÚNG' : 'SAI'}, ${stash.score}/${stash.maxScore})`;
+          type = stash.correct ? 'allow' : 'block';
+        } else if (stash.action === 'finished') {
+          if (stash.totalQuestions > 0 && stash.answeredCount < stash.totalQuestions) {
+            msg = `⚠️ CHƯA HOÀN THÀNH: Đã xem hết video nhưng thiếu câu hỏi (${stash.answeredCount}/${stash.totalQuestions})`;
+            type = 'block';
+          } else {
+            msg = `🏁 HOÀN THÀNH: Bạn đã xem hết video | Trả lời: ${stash.answeredCount}/${stash.totalQuestions} câu hỏi`;
+            type = 'allow';
+          }
+        } else if (stash.action === 'played') {
+          msg = `▶️ ĐANG PHÁT`;
+        } else if (stash.action === 'paused') {
+          msg = `⏸️ TẠM DỪNG`;
+        } else if (stash.action === 'error') {
+          msg = `❌ LỖI TRÌNH PHÁT`;
+          type = 'block';
+        }
+
+        if (stash.action !== 'interacted') {
+          addLog(msg, type, stash.time);
         }
       }
 
-      // Nhận đồng bộ trạng thái mỗi 1 giây
+      // 3. Đồng bộ mỗi giây
       if (e.data.type === 'H5P_SYNC_STATE') {
         var state = e.data.data;
-        var statusBadge = document.getElementById('statusBadge');
-        
-        // Cập nhật nhãn trạng thái và tiến độ
-        var progressText = ` (Time: ${state.currentTime.toFixed(1)}s / Max: ${state.maxTimeReached.toFixed(1)}s / Total: ${state.duration.toFixed(1)}s)`;
-        var questionsText = state.totalQuestions > 0 ? ` | Q: ${state.answeredCount}/${state.totalQuestions}` : '';
-        
-        statusBadge.textContent = modeInfo[currentMode].label.split(' — ')[0] + progressText + questionsText;
-        
-        // Hiển thị trạng thái Hoàn thành (Completion)
-        if (state.isCompleted) {
-          statusBadge.className = 'status-badge status-none';
-          statusBadge.textContent = '✅ ĐÃ HOÀN THÀNH ' + progressText + questionsText;
-          
-          // Nếu chưa log xong thì gửi 1 cái log "Kết thúc" cuối cùng
-          if (window.lastCompletionLogged !== true) {
-            var completionEvent = { 
-              type: 'summary', 
-              action: 'completed_all', 
-              timestamp: new Date().toISOString(),
-              totalQuestions: state.totalQuestions,
-              answeredCount: state.answeredCount,
-              currentTime: state.currentTime
-            };
-            syncToBackend(completionEvent);
-            window.lastCompletionLogged = true;
-            
-            addLog('🏆 TUYỆT VỜI: Bạn đã hoàn thành toàn bộ nội dung học tập!', 'allow');
-            dumpJson('HOÀN THÀNH TOÀN BỘ', completionEvent);
-          }
-        } else {
-          statusBadge.className = 'status-badge ' + modeInfo[currentMode].cls;
-          window.lastCompletionLogged = false;
-        }
-      }
 
-      if (e.data.type === 'SEEK_BLOCKER_READY') {
-        addLog('✅ Hệ thống Telemetry Nâng cao đã sẵn sàng!', 'allow');
+        if (window.lastSec !== Math.floor(state.currentTime)) {
+          addLog('📺 Watching...', 'info', state.currentTime);
+          window.lastSec = Math.floor(state.currentTime);
+        }
       }
     });
 
-    // ── Khởi tạo H5P ──
     document.addEventListener('DOMContentLoaded', function () {
-      // Bắt đầu Live Sync từ file thật trên server
-      startLiveSync();
-
-      // Mỗi lần load lại trang (F5), thực hiện xoá sạch log cũ trên server
-      syncToBackend({ type: 'reset' });
-
       var el = document.getElementById('h5p-container');
       new H5PStandalone.H5P(el, {
         h5pJsonPath: './h5p-content',
         frameJs: 'https://cdn.jsdelivr.net/npm/h5p-standalone@latest/dist/frame.bundle.js',
         frameCss: 'https://cdn.jsdelivr.net/npm/h5p-standalone@latest/dist/styles/h5p.css',
         customJs: './seek-blocker.js',
-      }).then(function () {
-        addLog('H5P Player đã load xong!', 'allow');
-      });
+      }).then(() => addLog('H5P Player đã load xong.', 'allow', 0));
     });
   </script>
 </body>
