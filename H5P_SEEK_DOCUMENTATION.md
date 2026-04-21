@@ -55,4 +55,17 @@ Việc phát video tới giây cuối cùng không đồng nghĩa với hoàn th
 - **Trường hợp hợp lệ**: Cờ `isCompleted` được gán, hệ thống ban hành thẻ xác thực `🏁 HOÀN THÀNH`. Dữ liệu này được niêm phong cho toàn bộ phiên làm việc.
 
 ---
+
+## 5. Danh mục Sự kiện (Event Dictionary)
+
+Chi tiết các tín hiệu được truyền tải qua `postMessage` từ Iframe H5P ra ứng dụng cha:
+
+| Loại sự kiện (`type`) | Kích hoạt (Trigger) | Ý nghĩa / Mục tiêu |
+| :--- | :--- | :--- |
+| **`H5P_SYNC_STATE`** | Tần suất 1000ms | **Heartbeat**: Cập nhật real-time `currentTime`, `duration`, `isCompleted`, và tiến độ câu hỏi. |
+| **`H5P_STASH_EVENT`**| Tương tác thực tế | **Interaction Log**: Ghi nhận chi tiết hành vi Play, Pause, Answer (Đúng/Sai) và mốc hoàn thành. |
+| **`SEEK_DEBUG`** | Thao tác tua video | **Navigation Audit**: Cung cấp dữ liệu đối soát hành vi tua video (Hợp lệ vs Bị chặn). |
+| **`SEEK_BLOCKER_READY`**| Khởi tạo script | **Handshake**: Xác nhận hệ thống giám sát đã sẵn sàng hoạt động. |
+
+---
 *Tài liệu đặc tả V5.0 - Áp dụng Cơ chế "Kỷ luật Thép" trong đánh giá tiến độ học tập (Strict Enforcement).*
