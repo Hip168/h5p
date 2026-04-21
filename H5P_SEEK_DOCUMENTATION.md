@@ -1,57 +1,58 @@
-# H5P Telemetry & Navigation Control Specification (V4.0)
+# H5P Telemetry & Navigation Control Specification (V5.0)
 
-Tài liệu đặc tả kỹ thuật cho hệ thống giám sát hành vi người dùng và kiểm soát điều hướng (Seek Control) trên nền tảng H5P Interactive Video.
+Tài liệu đặc tả kỹ thuật cho hệ thống giám sát hành vi người dùng, kiểm soát điều hướng (Seek Control) và đánh giá tiến trình học tập trên nền tảng H5P Interactive Video.
 
 ---
 
 ## 1. Kiến trúc Hệ thống (System Architecture)
 
-Hệ thống được thiết kế theo mô hình **Real-time Event Stream**, tập trung vào việc cung cấp phản hồi tức thì cho người quản lý thông qua giao diện điều khiển (Dashboard).
+Hệ thống được thiết kế theo mô hình **Zero-Persistence Analytics** kết hợp **Real-time Event Stream**, tập trung vào việc quản lý dữ liệu tại Client-side và cung cấp phản hồi lập tức.
 
-### 1.1. Luồng Đồng bộ Trạng thái (UI State Synchronization)
-- **Tần suất**: 1000ms Interval.
-- **IPC Mechanism**: `postMessage` API giữa Iframe H5P và Host Window.
-- **Scope**: Phục vụ việc hiển thị trạng thái động (Badge) và cập nhật Timeline.
+### 1.1. Giao tiếp Liên tiến trình (IPC Mechanism)
+- **Giao thức**: `postMessage` API hai chiều giữa Iframe H5P và phiên bản cha (Host Window).
+- **Tần suất Heartbeat**: Bộ định thời 1000ms (`setInterval`) liên tục đồng bộ dữ liệu trạng thái (Sync State).
 
-### 1.2. Nhật ký Dòng thời gian trực quan (Visual Time-series Logging)
-- **Cơ chế**: **High-detail Event Sampling**.
-- **Display**: `Professional Event Log` (Full-width).
-- **Metadata**: Mọi hành động đều được gắn nhãn thời gian video (`[XX.Xs]`) chính xác đến từng mili giây.
+### 1.2. Màn hình Log Thời gian thực (Visual Time-series Logging)
+- **Cơ chế**: High-detail Event Sampling (Lấy mẫu dữ liệu sự kiện độ phân giải cao).
+- **Metadata**: Mọi bản ghi (Log entry) đều tuân thủ cấu trúc gắn nhãn thời gian video (`[XX.Xs]`) có độ chính xác đến mili giây. Hệ thống backend (`tracking_logger.py`) đã bị loại bỏ hoàn toàn, mọi hoạt động phân tích được off-load sang DOM UI.
 
 ---
 
-## 2. Đặc tả Xử lý Tương tác (Interaction Logic)
+## 2. Đặc tả Khởi tạo Tham số Tương tác (Interaction Initialization)
 
-### 2.1. Quản lý Vòng đời Tua (Seek Interaction Lifecycle)
-- **Detection**: Giám sát trạng thái `mousedown`/`mouseup` trên DOM Iframe.
-- **Timestamping**: Tự động ghi nhận mốc thời gian bắt đầu và kết thúc của hành động tua.
-- **Blocking Policy**: Áp dụng luật chặn nghiêm ngặt đối với hành vi "Tua tới" vùng chưa xem (Forward seeking). Ghi log `🚫 CHẶN` trực tiếp lên UI kèm mốc thời gian vi phạm.
+Sự chính xác của tập dữ liệu tương tác (Questions/Quizzes) là cốt lõi để đánh giá trạng thái hoàn thành.
 
-### 2.2. Tổng kết Hoàn thành (Completion Summary)
-- **Cơ chế**: Khi phát hiện sự kiện `finished`, hệ thống tự động tổng hợp dữ liệu toàn quá trình.
-- **Thông số**: Hiển thị tổng quát: `Tổng thời gian đã xem` | `Tổng số câu hỏi đã tương tác`.
+### 2.1. Direct Fetching Mechanism
+- **Phương pháp chính**: Request HTTP trực tiếp tới tệp cấu hình nguồn (`h5p-content/content/content.json`).
+- **Phân tích cú pháp (Parsing)**: Bóc tách đường dẫn `interactiveVideo.assets.interactions`, lặp qua danh sách đối tượng (Mảng), kết hợp cơ chế ngoại trừ các thư viện phi tương tác (ví dụ: `H5P.Label`). 
+- **Độ tin cậy**: Quá trình này được thực thi độc lập, miễn nhiễm với sự chậm trễ trong quá trình khởi tạo đối tượng DOM của trình phát H5P. Đảm bảo độ chính xác của tham số `totalQuestions` đạt 100%.
 
----
-
-## 3. Đặc tả Giao tiếp & Giám sát (Communication & Monitoring)
-
-### 3.1. Terminal-only Backend Stream
-Hệ thống loại bỏ hoàn toàn việc lưu trữ file vật lý (`.json`) để tối ưu hiệu suất và dung lượng.
-- **Stream**: Dữ liệu tương tác được đẩy về cổng **9000** (`tracking_logger.py`).
-- **Monitoring**: Dữ liệu chỉ được hiển thị trực tiếp trên màn hình Console/Terminal của người quản trị (Live Debugging).
-
-### 3.2. Dashboard UX
-- **Event Log**: Bảng log chuyên nghiệp, hỗ trợ cuộn tự động và sao chép dữ liệu nhanh.
-- **Status Badge**: Hiển thị tiến độ phần trăm (%) và số lượng câu hỏi đã trả lời thời gian thực.
+### 2.2. Aggressive Failsafe (Cơ chế Dự phòng Đa tầng)
+- Nếu tác vụ lấy dữ liệu qua luồng HTTP thất bại, hệ thống tự động Fallback (dự phòng) sang chế độ "Vét cạn" (Deep scan) bên trong bộ nhớ đối tượng `H5P.instances[0]`.
+- Mẫu số `totalQuestions` bị **khóa tĩnh (locked)**. Bất kỳ sự kiện nào cố tình ghi đè giá trị này về `0` đều bị chặn lại. 
+- Trong trường hợp cực đoan (Số phản hồi lấy được lớn hơn số định mức trong tệp tin cấu hình), bộ đếm Tổng động đồng bộ hóa chặn dưới: `totalQuestions = max(totalQuestions, answeredIds.size)`.
 
 ---
 
-## 4. Khả năng Phân tích (Analytics Capability)
+## 3. Quản lý Điều hướng (Seek Management)
 
-Dữ liệu trên Event Log cho phép:
-- **Real-time Auditing**: Kiểm tra ngay lập tức hành vi của học viên mà không cần chờ trích xuất file.
-- **Interaction Heatmap**: Theo dõi các điểm dừng (Pause/Play) và các lỗi phát sinh trong quá trình phát video.
-- **Compliance Check**: Xác nhận trạng thái `HOÀN THÀNH` một cách minh bạch với đầy đủ bằng chứng về chỉ số tương tác.
+- **Detection**: Liên kết bộ lắng nghe sự kiện tại các DOM node điều hướng thanh trượt (Slider DOM Elements).
+- **Debouncing**: Áp dụng cửa sổ thời gian 300ms nhằm chống ngập lụt tín hiệu (Flood control) khi người dùng kéo thả thanh điều hướng.
+- **Strict Blocking Policy**: Ở chế độ cấu hình `full` hoặc `both`, hệ thống đối soát độ lệch thời gian (`to > maxTimeReached + 0.2s`). Hành vi vi phạm sẽ kích hoạt tín hiệu `🚫 CHẶN` trực tiếp trên Event Stream và ép luồng video quay lại vị trí hợp lệ cuối cùng.
 
 ---
-*Tài liệu này là đặc tả cuối cùng sau khi chuyển đổi sang mô hình UI-Focused Telemetry.*
+
+## 4. Chính sách Đánh giá Hoàn thành (Strict Completion Policy)
+
+Việc phát video tới giây cuối cùng không đồng nghĩa với hoàn thành nếu người dùng chưa thỏa mãn bộ quy tắc tác vụ.
+
+### 4.1. Điều kiện Xét duyệt (Validation Rules)
+1. **Trigger Condition**: Tín hiệu `H5P.Video.ENDED` được phát ra, hoặc sai số thời gian giữa độ dài chuẩn của video và thời điểm hiện tại `Math.abs(duration - time) <= 0.5s`.
+2. **Boolean Check**: Mệnh đề `answeredIds.size >= totalQuestions` phải trả về `True`.
+
+### 4.2. Phản ứng Hệ thống (System Behaviors)
+- **Trường hợp vi phạm**: Từ chối thiết lập cờ `isCompleted = true`. Hệ thống phát ra tín hiệu `⚠️ CHƯA HOÀN THÀNH` trực quan hóa trên giao diện điều khiển, chỉ rõ tỷ lệ phản hồi thiếu hụt (`[Answered]/[Total]`).
+- **Trường hợp hợp lệ**: Cờ `isCompleted` được gán, hệ thống ban hành thẻ xác thực `🏁 HOÀN THÀNH`. Dữ liệu này được niêm phong cho toàn bộ phiên làm việc.
+
+---
+*Tài liệu đặc tả V5.0 - Áp dụng Cơ chế "Kỷ luật Thép" trong đánh giá tiến độ học tập (Strict Enforcement).*
