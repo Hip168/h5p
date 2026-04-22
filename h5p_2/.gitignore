@@ -1,0 +1,6 @@
+1.h5p
+# H5P Content & Player (Heavy files)
+h5p-content/
+
+# Logs
+# activity_summary.json (Mở comment nếu bạn không muốn đẩy file log lên git)
